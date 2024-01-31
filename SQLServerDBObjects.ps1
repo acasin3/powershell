@@ -72,3 +72,8 @@ Get-ChildItem $USERS_FOLDER |
 ForEach-Object {
     Rename-Item -Path $_.FullName -NewName $_.FullName.Replace(".User", "")
 }
+
+# Change encoding to ASCII for all files
+Get-ChildItem $ROOT_FOLDER -File -Recurse | ForEach-Object {
+    Set-Content -Path $_.FullName -Value (Get-Content -Path $_.FullName) -Encoding ASCII
+}
