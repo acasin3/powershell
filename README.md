@@ -93,6 +93,148 @@ Getting the installer path from the pipeline in Method 1 is possible because the
 3. Add retry option for each mirror in case the download attempt fails.
 4. Error logging.
 
-## database-errors
+## email-errors
 
-Emails an html file called db_errors.html that contains data stored in the Errors table of the database.
+Emails an html file containing data stored in the Errors table of the database.
+
+#### Setup
+
+Below is the table and view definitions to be used.
+
+```sql
+USE YourDB -- amend accordingly
+go
+
+CREATE TABLE [dbo].[ErrorLog](
+	[ErrorID] [int] IDENTITY(1,1) NOT NULL,
+	[ErrorNumber] [int] NOT NULL,
+	[ErrorMessage] [varchar](4000) NULL,
+	[ErrorSeverity] [smallint] NOT NULL,
+	[ErrorState] [smallint] NOT NULL,
+	[ErrorRoutine] [varchar](200) NOT NULL,
+	[ErrorLine] [int] NOT NULL,
+	[UserName] [varchar](128) NOT NULL,
+	[HostName] [varchar](128) NOT NULL,
+	[Time_Stamp] [datetime] NOT NULL,
+	CONSTRAINT [PK__ErrorLog] PRIMARY KEY CLUSTERED ([ErrorID] ASC)
+) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[ErrorLog] ADD  CONSTRAINT [DF__ErrorLog__ErrorState]  DEFAULT ((1)) FOR [ErrorState]
+GO
+
+ALTER TABLE [dbo].[ErrorLog] ADD  CONSTRAINT [DF__ErrorLog__ErrorLine]  DEFAULT ((0)) FOR [ErrorLine]
+GO
+
+ALTER TABLE [dbo].[ErrorLog] ADD  CONSTRAINT [DF__ErrorLog__UserName]  DEFAULT ('') FOR [UserName]
+GO
+
+ALTER TABLE [dbo].[ErrorLog] ADD  CONSTRAINT [DF__ErrorLog__HostName]  DEFAULT ('') FOR [HostName]
+
+
+GO
+
+CREATE VIEW vwErrorsToday
+AS
+	SELECT	*
+	FROM	ErrorLog
+	WHERE	Time_Stamp >= CAST(GETDATE() AS date)
+		AND Time_Stamp < DATEADD(day, 1, CAST(GETDATE() AS date))
+
+GO
+
+-- Random data
+INSERT INTO [dbo].[ErrorLog] ([ErrorNumber], [ErrorMessage], [ErrorSeverity], [ErrorState], [ErrorRoutine], [ErrorLine], [UserName], [HostName], [Time_Stamp]) VALUES
+(547, 'The INSERT statement conflicted with the FOREIGN KEY constraint', 16, 1, 'sp_CreateOrder', 245, 'jsmith', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8152, 'String or binary data would be truncated', 16, 2, 'usp_UpdateCustomerInfo', 78, 'agarcia', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(1205, 'Transaction was deadlocked on lock resources with another process', 13, 1, 'sp_ProcessPayments', 156, 'mwilson', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(2627, 'Violation of PRIMARY KEY constraint', 14, 1, 'usp_AddNewProduct', 89, 'tlee', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(515, 'Cannot insert the value NULL into column', 16, 2, 'sp_InsertOrderDetails', 112, 'rjohnson', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(233, 'Column name or number of supplied values does not match table definition', 16, 1, 'usp_ImportData', 325, 'kpatel', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8114, 'Error converting data type varchar to numeric', 16, 3, 'sp_CalculateMetrics', 201, 'jwang', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(207, 'Invalid column name "ShippingStatus"', 16, 1, 'usp_TrackShipment', 142, 'snguyen', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(1222, 'Lock request time out period exceeded', 16, 1, 'sp_GenerateReports', 278, 'dkim', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8144, 'Procedure or function has too many arguments specified', 15, 1, 'usp_ValidateUser', 65, 'cbrown', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(208, 'Invalid object name "InventoryHistory"', 16, 1, 'sp_CheckInventory', 187, 'lrodriguez', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(3903, 'Failed to initialize the required transaction context', 16, 1, 'usp_ProcessBatch', 221, 'mthomas', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8115, 'Arithmetic overflow error converting expression to data type int', 16, 2, 'sp_CalculateTotals', 109, 'janderson', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(4064, 'Cannot open user default database. Login failed', 16, 1, 'usp_ConnectToDatabase', 33, 'hgomez', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(18456, 'Login failed for user', 14, 1, 'sp_AuthenticateUser', 50, 'pwilliams', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(4060, 'Cannot open database requested', 16, 1, 'usp_DatabaseConnection', 75, 'amorris', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(229, 'SELECT permission denied on object', 14, 1, 'sp_RetrieveData', 128, 'echang', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(3701, 'Cannot drop the table because it does not exist', 11, 1, 'usp_CleanupTables', 92, 'gsingh', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(1750, 'Could not create constraint. See previous errors', 16, 1, 'sp_AlterTableStructure', 143, 'bbaker', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8602, 'Internal Query Processor Error', 17, 1, 'usp_ExecuteComplexQuery', 289, 'jmartinez', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(3902, 'The COMMIT TRANSACTION request has no corresponding BEGIN TRANSACTION', 16, 1, 'sp_ProcessTransaction', 173, 'rtaylor', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8901, 'Table already exists', 16, 1, 'usp_CreateTempTable', 87, 'slewis', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8134, 'Divide by zero error encountered', 16, 1, 'sp_CalculateRatios', 152, 'vreed', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(3906, 'Failed to update database because the database is read-only', 16, 1, 'usp_UpdateConfig', 211, 'nclark', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8102, 'Cannot update a timestamp column', 16, 1, 'sp_UpdateLastModified', 67, 'dparker', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(7630, 'Out of space on disk', 17, 1, 'usp_BackupDatabase', 321, 'kmuller', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(50000, 'Custom error: Failed to process payment', 16, 1, 'sp_ProcessPayment', 187, 'flopez', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(50000, 'Custom error: Invalid product code format', 16, 1, 'usp_ValidateProductCode', 93, 'twilson', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(50000, 'Custom error: Customer credit limit exceeded', 16, 1, 'sp_CheckCreditLimit', 142, 'lscott', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(50000, 'Custom error: Email notification failed', 16, 1, 'usp_SendNotification', 218, 'madams', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(547, 'The ALTER TABLE statement conflicted with the CHECK constraint', 16, 1, 'sp_ModifyTableConstraints', 156, 'jhall', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8152, 'String or binary data would be truncated in table "Customers", column "Email"', 16, 3, 'usp_UpdateEmail', 82, 'cturner', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(1205, 'Transaction was deadlocked on lock resources with another process', 13, 1, 'sp_UpdateInventory', 193, 'emartin', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(2627, 'Violation of UNIQUE KEY constraint', 14, 1, 'usp_RegisterUser', 75, 'rgreen', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(515, 'Cannot insert the value NULL into column "CustomerID"', 16, 2, 'sp_CreateCustomer', 128, 'wlee', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(233, 'Column name or number of supplied values does not match table definition', 16, 1, 'usp_BulkInsert', 342, 'dwhite', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8114, 'Error converting data type varchar to decimal', 16, 3, 'sp_ParseFinancialData', 217, 'jharris', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(207, 'Invalid column name "TaxRate"', 16, 1, 'usp_CalculateTax', 151, 'asamson', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(1222, 'Lock request time out period exceeded', 16, 1, 'sp_GenerateMonthlyReport', 289, 'mkhan', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8144, 'Procedure or function has too many arguments specified', 15, 1, 'usp_SearchProducts', 73, 'sbaker', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(208, 'Invalid object name "CustomerRatings"', 16, 1, 'sp_GetCustomerFeedback', 192, 'pmiller', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(3903, 'Failed to initialize the required transaction context', 16, 1, 'usp_ProcessPurchase', 228, 'jwilliams', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8115, 'Arithmetic overflow error converting numeric to data type numeric', 16, 2, 'sp_CalculateRevenue', 121, 'tkim', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(4064, 'Cannot open user default database. Login failed', 16, 1, 'usp_InitializeSystem', 45, 'lchen', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(18456, 'Login failed for user "app_service"', 14, 1, 'sp_VerifyCredentials', 62, 'mmiller', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(4060, 'Cannot open database "SalesArchive"', 16, 1, 'usp_ArchiveData', 87, 'bgonzalez', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(229, 'INSERT permission denied on object "Orders"', 14, 1, 'sp_CreateOrder', 135, 'dperez', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(3701, 'Cannot drop the procedure because it does not exist', 11, 1, 'usp_UpdateStoredProcedures', 101, 'rroberts', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(1750, 'Could not create constraint. See previous errors', 16, 1, 'sp_CreateRelationship', 156, 'hsanchez', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8602, 'Internal Query Processor Error', 17, 1, 'usp_RunAnalysis', 302, 'rjackson', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(3902, 'The ROLLBACK TRANSACTION request has no corresponding BEGIN TRANSACTION', 16, 1, 'sp_ProcessRefund', 187, 'awong', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8901, 'Table "TempResults" already exists', 16, 1, 'usp_GenerateReport', 93, 'mwalker', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8134, 'Divide by zero error encountered', 16, 1, 'sp_ComputeAverages', 167, 'cmurphy', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(3906, 'Failed to update database because the database is read-only', 16, 1, 'usp_UpdateSettings', 224, 'gpatel', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8102, 'Cannot update identity column "OrderID"', 16, 1, 'sp_FixOrderData', 72, 'hcooper', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(7630, 'Out of space on tempdb', 17, 1, 'usp_GenerateReports', 337, 'rthomas', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(50000, 'Custom error: API connection timeout', 16, 1, 'sp_SyncExternalData', 198, 'dcosta', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(50000, 'Custom error: Data validation failed', 16, 1, 'usp_ValidateImport', 104, 'jramirez', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(50000, 'Custom error: Shipping calculation error', 16, 1, 'sp_CalculateShipping', 153, 'ekelly', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(50000, 'Custom error: File upload failed', 16, 1, 'usp_ProcessAttachment', 231, 'cwu', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(547, 'The UPDATE statement conflicted with the REFERENCE constraint', 16, 1, 'sp_UpdateProductCategory', 168, 'nthompson', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(8152, 'String or binary data would be truncated in table "Products", column "SKU"', 16, 3, 'usp_ImportProducts', 91, 'bbrown', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE())),
+(1205, 'Transaction was deadlocked on lock resources with another process', 13, 1, 'sp_BatchUpdate', 207, 'awright', 'WEB-SRV-03', DATEADD(DAY, -RAND()*365, GETDATE())),
+(2627, 'Violation of UNIQUE KEY constraint "UQ_Email"', 14, 1, 'usp_AddUser', 82, 'mrodriguez', 'SQL-SRV-01', DATEADD(DAY, -RAND()*365, GETDATE())),
+(515, 'Cannot insert the value NULL into column "OrderDate"', 16, 2, 'sp_PlaceOrder', 142, 'khernandez', 'APP-SRV-02', DATEADD(DAY, -RAND()*365, GETDATE()))
+```
+
+#### Script to Send the Database Errors Report
+```Powershell
+try {
+    $SMTPServer = "smtp.gmail.com"
+    $SMTPPort = 587
+    $From = "your-email@gmail.com"  # Use your email address
+    $To = "admin@example.com"       # Recipient's email address
+    $Subject = "Database Errors - $(Get-Date -Format 'MMMM d, yyyy HH:mm:ss')"
+    $Body = "Database Errors Today"
+    $AppPassword = "xxxxxxxxxxxx"  # Use the generated app password
+    $Credential = New-Object System.Management.Automation.PSCredential ($From, (ConvertTo-SecureString $AppPassword -AsPlainText -Force))
+
+    GenerateErrorsTodayReport   -sqlServer '.\MSSQLSERVER' `
+                                -dbName 'YourDB' `
+        | Send-MailMessage  -From $From `
+                            -To $To `
+                            -Subject $Subject `
+                            -Body $Body `
+                            -SmtpServer $SMTPServer `
+                            -Port $SMTPPort `
+                            -UseSsl `
+                            -Credential $Credential
+} catch {
+    Write-Host $_
+}
+```
