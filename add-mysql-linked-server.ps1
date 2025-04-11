@@ -1,9 +1,7 @@
 # Import the SqlServer module with error handling
 try {
     Import-Module SqlServer -ErrorAction Stop
-    Write-Host "SqlServer module loaded successfully."
-}
-catch {
+} catch {
     Write-Error "Failed to import SqlServer module: $_"
     exit 1  # Exit if the module is critical to your script's functionality
 }
@@ -41,8 +39,7 @@ function Start-Download {
 
         # Output the full path of the downloaded file so it can be "piped" to the next command
         return $downloadPath
-    }
-    catch {
+    } catch {
         Write-Error "Failed to download the file: $_"
         exit 1
     }
@@ -72,14 +69,13 @@ function Install-MySqlOdbc {
 	                Write-Error "Installer exited with code $($process.ExitCode)"
 	                exit $process.ExitCode
 	            }
-	        }
-            catch {
+	        } catch {
                 Write-Error "Installation failed: $_"
 	            exit 1
 	        }
         } else {
-            Write-Error "Installer not found at $downloadPath"
-	        exit 1
+            Write-Error "Installer not found at $installerPath"
+            exit 1
 	    }
 	}
 }
@@ -107,8 +103,7 @@ function Test-OdbcDsnExists {
         }
 
         return Test-Path $basePath
-    }
-    catch {
+    } catch {
         Write-Error "Error checking ODBC DSN: $_"
         return $false
     }
@@ -129,10 +124,7 @@ function Add-MySqlOdbcDsn {
         [string]$DsnType = "System",
 
         [Parameter(Mandatory)]
-        [string]$DbServerUserId,
-
-        [Parameter(Mandatory)]
-        [string]$DbServerPwd,
+        [PSCredential]$DbCredential,
 
         [switch]$Force
     )
@@ -145,8 +137,7 @@ function Add-MySqlOdbcDsn {
             Remove-OdbcDsn -Name $DsnName -DsnType $DsnType
             # Now that the ODBC has been remove, update the $exists flag.
             $exists = $false
-        }
-        catch {
+        } catch {
             Write-Error "Failed to remove DSN '$DsnName': $_"
             exit 1
         }
@@ -154,10 +145,9 @@ function Add-MySqlOdbcDsn {
 
     if (-not $exists) {
         try {
-            Add-OdbcDsn -Name $DsnName -DriverName $DriverName -DsnType $DsnType -SetPropertyValue @("User=$DbServerUserId", "Password=$DbServerPwd", "Description=$Description")
+            Add-OdbcDsn -Name $DsnName -DriverName $DriverName -DsnType $DsnType -SetPropertyValue @("User=$DbCredential.UserName", "Password=$DbCredential.GetNetworkCredential().Password", "Description=$Description")
             Write-Host "DSN '$DsnName' created successfully."
-        }
-        catch {
+        } catch {
             Write-Error "Failed to create DSN '$DsnName': $_"
         }
     }
@@ -179,10 +169,7 @@ function Add-MySQLLinkedServer {
         [string]$dsnName,
 
         [Parameter(Mandatory)]
-        [string]$mysqlUserName,
-
-        [Parameter(Mandatory)]
-        [string]$mySqlPwd,
+        [PSCredential]$credential,
 
         [switch]$Force
     )
@@ -200,8 +187,7 @@ function Add-MySQLLinkedServer {
                                             -Query $sql
 
         $linkedServerExists = ($null -eq $linkedServerCheck) ? $false : $true
-    }
-    catch {
+    } catch {
         Write-Error "Error checking linked server: $_"
     }
 
@@ -212,8 +198,7 @@ function Add-MySQLLinkedServer {
             Invoke-SqlCmd -ConnectionString $connString -Query $sql
             # The linked server no longer exists; update existence flag
             $linkedServerExists = $false
-        }
-        catch {
+        } catch {
             Write-Error "Failed to drop linked server '$linkedServerName': $_"
             exit 1
         }
@@ -235,12 +220,11 @@ function Add-MySQLLinkedServer {
                 @rmtsrvname = N'$linkedServerName',
                 @useself = N'False',
                 @locallogin = NULL,
-                @rmtuser = $mysqlUserName,
-                @rmtpassword = $mySqlPwd
+                @rmtuser = '$($credential.UserName)',
+                @rmtpassword = '$($credential.GetNetworkCredential().Password)'
 "@
             Invoke-SqlCmd -ConnectionString $connString -Query $sql
-        }
-        catch {
+        } catch {
             Write-Error "Failed to create linked server '$linkedServerName': $_"
         }
     }
@@ -248,54 +232,3 @@ function Add-MySQLLinkedServer {
         Write-Error "Linked server '$linkedServerName' already exists."
     }
 }
-
-# Usage:
-
-$mysqlUserName = 'root'
-$mysqlPwd = 'root'
-
-Start-Download  -DownloadUrl 'https://cdn.mysql.com/Downloads/Connector-ODBC/9.2/mysql-connector-odbc-9.2.0-winx64.msi' `
-                -DownloadMessage 'Downloading driver' `
-    | Install-MySqlOdbc  `
-    | Add-MySqlOdbcDsn  -DsnName "DsnDemoUsingPSWebClient" `
-                        -Description "DSN Created via Powershell" `
-                        -DriverName "MySQL ODBC 9.2 ANSI Driver" `
-                        -DsnType "System" `
-                        -DbServerUserId $mysqlUserName `
-                        -DbServerPwd $mysqlPwd `
-                        -Force `
-    | Add-MySQLLinkedServer -serverName 'DESKTOP-MJ0SQAI\MSSQLSERVER2019' `
-                            -linkedServerName 'LinkedServerPS' `
-                            -dsnName 'DsnDemoUsingPSWebClient' `
-                            -mysqlUserName $mysqlUserName `
-                            -mySqlPwd $mysqlPwd `
-                            -Force
-
-<#
-
-The same can be achieved using the built-in `Invoke-WebRequest`
-
-$mysqlUserName = 'root'
-$mysqlPwd = 'root'
-
-$downloadUrl = 'https://cdn.mysql.com/Downloads/Connector-ODBC/9.2/mysql-connector-odbc-9.2.0-winx64.msi'
-$fileName = $downloadUrl | Split-Path -Leaf
-$outFile = "$env:temp\$fileName"
-
-Invoke-WebRequest   $downloadUrl -OutFile $outFile
-Install-MySqlOdbc   $outFile -ErrorAction Stop
-Add-MySqlOdbcDsn    -DsnName "DsnDemoUsingInvokeWebRequest" `
-                    -Description "DSN Created via Powershell" `
-                    -DriverName "MySQL ODBC 9.2 ANSI Driver" `
-                    -DsnType "System" `
-                    -DbServerUserId $mysqlUserName `
-                    -DbServerPwd $mysqlPwd `
-                    -Force
-Add-MySQLLinkedServer -serverName 'DESKTOP-MJ0SQAI\MSSQLSERVER2019' `
-                            -linkedServerName 'LinkedServerPS' `
-                            -dsnName 'DsnDemoUsingPSWebClient' `
-                            -mysqlUserName $mysqlUserName `
-                            -mySqlPwd $mysqlPwd `
-                            -Force
-
-#>
