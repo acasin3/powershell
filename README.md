@@ -20,7 +20,7 @@ https://support.sqldbm.com/knowledge-bases/2/articles/245-how-to-generate-sql-sc
 
 Contains functions to download the MySQL ODBC from a CDN mirror, install it, create a system DSN, and create a linked server in an SQL Server instance based on the said DSN .
 
-### Example usage : Method 1
+#### Example usage : Method 1
 
 ```powershell
 $cred = Get-Credential -Message "Enter MySQL credentials"
@@ -52,7 +52,7 @@ try {
 ```
 
 
-### Example usage : Method 2
+#### Example usage : Method 2
 
 ```powershell
 try {
@@ -82,12 +82,12 @@ try {
 }
 ```
 
-### Notes:
+#### Notes:
 The difference Method 1 and Method 2 is in how the Install-MySqlOdbc function is used. In Method 1, the path of the downloaded driver is taken from the pipeline, while in Method 2, the path is passed into it.
 
 Getting the installer path from the pipeline in Method 1 is possible because the custom Start-Download function returns the path of the downloaded driver, while Method 2, which uses the built-in Invoke-WebRequest, does not.
 
-### Future Enhancements:
+#### Future Enhancements:
 1. Save credentials in a file instead of prompting the user.
 2. Add option to download from alternate mirrors.
 3. Add retry option for each mirror in case the download attempt fails.
